@@ -2,7 +2,7 @@
 
 [![npm version](https://img.shields.io/npm/v/@apinator/client.svg)](https://www.npmjs.com/package/@apinator/client)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![CI](https://img.shields.io/github/actions/workflow/status/apinator-io/client-js/test.yml?label=CI)](https://github.com/apinator-io/client-js/actions/workflows/test.yml)
+[![CI](https://img.shields.io/github/actions/workflow/status/apinator-io/sdk-js/test.yml?label=CI)](https://github.com/apinator-io/client-js/actions/workflows/test.yml)
 
 JavaScript client SDK for [Apinator](https://apinator.io) — real-time WebSocket messaging for web applications.
 
