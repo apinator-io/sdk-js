@@ -1,21 +1,17 @@
 ---
 name: Feature Request
-about: Suggest a new feature for @apinator/sdk
+about: Suggest a feature for @apinator/client
 labels: enhancement
 ---
 
-## Description
-A clear description of the feature you'd like.
+## Problem
 
-## Use Case
-Why is this feature needed? What problem does it solve?
+What problem does this feature solve?
 
-## Proposed API
-How would you expect to use this feature?
+## Proposed Solution
 
-```typescript
-// Example usage
-```
+How should it work?
 
-## Alternatives
-Any alternative solutions or workarounds you've considered.
+## Alternatives Considered
+
+Any alternative approaches you've considered.
