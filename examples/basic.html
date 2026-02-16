@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Apinator SDK — Basic Pub/Sub</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 600px; margin: 2rem auto; padding: 0 1rem; }
+    #log { background: #f5f5f5; padding: 1rem; border-radius: 4px; min-height: 200px; white-space: pre-wrap; font-family: monospace; font-size: 14px; }
+    .status { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; }
+    .connected { background: #d4edda; color: #155724; }
+    .disconnected { background: #f8d7da; color: #721c24; }
+    .connecting { background: #fff3cd; color: #856404; }
+  </style>
+</head>
+<body>
+  <h1>Basic Pub/Sub</h1>
+  <p>Status: <span id="status" class="status connecting">connecting</span></p>
+  <div id="log"></div>
+
+  <script type="module">
+    import { RealtimeClient } from '../dist/index.js';
+
+    const log = document.getElementById('log');
+    const statusEl = document.getElementById('status');
+
+    function appendLog(msg) {
+      log.textContent += `[${new Date().toLocaleTimeString()}] ${msg}\n`;
+      log.scrollTop = log.scrollHeight;
+    }
+
+    const client = new RealtimeClient({
+      appKey: 'YOUR_APP_KEY',
+      cluster: 'eu',
+    });
+
+    // Monitor connection state
+    client.bind('state_change', ({ previous, current }) => {
+      statusEl.textContent = current;
+      statusEl.className = `status ${current}`;
+      appendLog(`Connection: ${previous} → ${current}`);
+    });
+
+    // Subscribe to a public channel
+    const channel = client.subscribe('demo-channel');
+
+    channel.bind('realtime:subscription_succeeded', () => {
+      appendLog('Subscribed to demo-channel');
+    });
+
+    channel.bind('greeting', (data) => {
+      appendLog(`Received greeting: ${JSON.stringify(data)}`);
+    });
+
+    client.connect();
+
+    appendLog('Connecting...');
+  </script>
+</body>
+</html>

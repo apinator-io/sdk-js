@@ -1,0 +1,39 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18, 20, 22]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - run: npm ci
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+      - name: Test with coverage
+        run: npm run test:coverage
+
+      - name: Smoke test package
+        run: |
+          npm pack --dry-run
+          node -e "const m = require('./dist/index.js'); if (!m.RealtimeClient) throw new Error('CJS missing RealtimeClient')"
+          node -e "import('./dist/index.mjs').then(m => { if (!m.RealtimeClient) throw new Error('ESM missing RealtimeClient') })"

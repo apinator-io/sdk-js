@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Apinator SDK — Private Channels</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 600px; margin: 2rem auto; padding: 0 1rem; }
+    #log { background: #f5f5f5; padding: 1rem; border-radius: 4px; min-height: 200px; white-space: pre-wrap; font-family: monospace; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <h1>Private Channels</h1>
+  <p>This example shows how to subscribe to a private channel that requires server-side authentication.</p>
+  <div id="log"></div>
+
+  <script type="module">
+    import { RealtimeClient } from '../dist/index.js';
+
+    const log = document.getElementById('log');
+
+    function appendLog(msg) {
+      log.textContent += `[${new Date().toLocaleTimeString()}] ${msg}\n`;
+      log.scrollTop = log.scrollHeight;
+    }
+
+    const client = new RealtimeClient({
+      appKey: 'YOUR_APP_KEY',
+      cluster: 'eu',
+      // Your backend must implement this endpoint.
+      // It receives { socket_id, channel_name } and returns { auth: "key:signature" }.
+      authEndpoint: '/api/realtime/auth',
+      // Optional: include session cookies or auth tokens
+      authHeaders: {
+        'Authorization': 'Bearer YOUR_SESSION_TOKEN',
+      },
+    });
+
+    client.connect();
+
+    // Subscribe to a private channel
+    const channel = client.subscribe('private-user-notifications');
+
+    channel.bind('realtime:subscription_succeeded', () => {
+      appendLog('Authenticated and subscribed to private channel');
+    });
+
+    channel.bind('realtime:subscription_error', (err) => {
+      appendLog(`Auth failed: ${JSON.stringify(err)}`);
+    });
+
+    channel.bind('notification', (data) => {
+      appendLog(`Notification: ${JSON.stringify(data)}`);
+    });
+
+    appendLog('Connecting with auth...');
+  </script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+src/
+test/
+docs/
+examples/
+.github/
+tsconfig.json
+tsup.config.ts
+CONTRIBUTING.md
+CHANGELOG.md
+.gitignore
+*.test.ts
+*.spec.ts
