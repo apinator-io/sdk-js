@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.0.0](https://github.com/apinator-io/sdk-js/compare/v1.0.0...v2.0.0) (2026-02-16)
+
+
+### ⚠ BREAKING CHANGES
+
+* reset release line
+
+### Features
+
+* reset release line ([6dd62c7](https://github.com/apinator-io/sdk-js/commit/6dd62c76d7d18d81668d8d2bffa1039a6e16cf5f))
+
 ## 1.0.0 (2026-02-16)
 
 
