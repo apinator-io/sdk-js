@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.0.0 (2026-02-16)
+
+
+### Features
+
+* initial release ([589282c](https://github.com/apinator-io/sdk-js/commit/589282cba58be4048a727824a685c40886dd91ca))
+
+
+### Bug Fixes
+
+* update github action client name ([9f081c0](https://github.com/apinator-io/sdk-js/commit/9f081c05b7048e4da1704844447d06ff38670531))
+
 ## [1.1.2](https://github.com/apinator-io/sdk-js/compare/v1.1.1...v1.1.2) (2026-02-16)
 
 
