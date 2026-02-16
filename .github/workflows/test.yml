@@ -35,5 +35,5 @@ jobs:
       - name: Smoke test package
         run: |
           npm pack --dry-run
-          node -e "const m = require('./dist/index.js'); if (!m.RealtimeClient) throw new Error('CJS missing RealtimeClient')"
-          node -e "import('./dist/index.mjs').then(m => { if (!m.RealtimeClient) throw new Error('ESM missing RealtimeClient') })"
+          node -e "const m = require('./dist/index.js'); if (!m.Apinator) throw new Error('CJS missing Apinator')"
+          node -e "import('./dist/index.mjs').then(m => { if (!m.Apinator) throw new Error('ESM missing Apinator') })"
