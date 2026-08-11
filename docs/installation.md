@@ -24,12 +24,12 @@ Use the SDK directly in the browser via a CDN:
 ```html
 <!-- ES Module -->
 <script type="module">
-  import { RealtimeClient } from 'https://cdn.jsdelivr.net/npm/@apinator/client/dist/index.mjs';
+  import { Apinator } from 'https://cdn.jsdelivr.net/npm/@apinator/client/dist/index.mjs';
 </script>
 
 <!-- unpkg alternative -->
 <script type="module">
-  import { RealtimeClient } from 'https://unpkg.com/@apinator/client/dist/index.mjs';
+  import { Apinator } from 'https://unpkg.com/@apinator/client/dist/index.mjs';
 </script>
 ```
 

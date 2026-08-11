@@ -6,7 +6,7 @@ Contributor guide to the `@apinator/client` internals.
 
 ```
 src/
-├── index.ts       — RealtimeClient (orchestrator)
+├── index.ts       — Apinator (orchestrator)
 ├── connection.ts  — WebSocket lifecycle + reconnection
 ├── channel.ts     — Channel + PresenceChannel
 ├── auth.ts        — Auth endpoint fetch
@@ -38,7 +38,7 @@ Any state ──disconnect()──→ disconnected (terminal, no reconnect)
 
 ## Channel Management
 
-`RealtimeClient` maintains a `Map<string, Channel>` of active subscriptions.
+`Apinator` maintains a `Map<string, Channel>` of active subscriptions.
 
 - **Subscribe**: creates a `Channel` (or `PresenceChannel` for `presence-` prefix), stores it, and sends `realtime:subscribe` if connected.
 - **Reconnect**: iterates all channels and re-sends subscribe messages.

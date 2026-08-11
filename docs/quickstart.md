@@ -11,9 +11,9 @@ npm install @apinator/client
 ## 2. Connect
 
 ```typescript
-import { RealtimeClient } from '@apinator/client';
+import { Apinator } from '@apinator/client';
 
-const client = new RealtimeClient({
+const client = new Apinator({
   appKey: 'your-app-key',
   cluster: 'eu', // or 'us'
 });
@@ -52,9 +52,9 @@ Events published from your server (via the server SDK) will now arrive in real t
 Use the [Node.js server SDK](https://www.npmjs.com/package/@apinator/server) to publish events:
 
 ```typescript
-import { RealtimeClient } from '@apinator/server';
+import { Apinator } from '@apinator/server';
 
-const client = new RealtimeClient({
+const client = new Apinator({
   appId: 'your-app-id',
   key: 'your-app-key',
   secret: 'your-app-secret',

@@ -21,7 +21,7 @@
   <div id="log"></div>
 
   <script type="module">
-    import { RealtimeClient } from '../dist/index.js';
+    import { Apinator } from '../dist/index.mjs';
 
     const log = document.getElementById('log');
     const memberList = document.getElementById('member-list');
@@ -40,7 +40,7 @@
         .join('');
     }
 
-    const client = new RealtimeClient({
+    const client = new Apinator({
       appKey: 'YOUR_APP_KEY',
       cluster: 'eu',
       authEndpoint: '/api/realtime/auth',

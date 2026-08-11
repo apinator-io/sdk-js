@@ -19,7 +19,7 @@
   <div id="log"></div>
 
   <script type="module">
-    import { RealtimeClient } from '../dist/index.js';
+    import { Apinator } from '../dist/index.mjs';
 
     const log = document.getElementById('log');
     const statusEl = document.getElementById('status');
@@ -29,7 +29,7 @@
       log.scrollTop = log.scrollHeight;
     }
 
-    const client = new RealtimeClient({
+    const client = new Apinator({
       appKey: 'YOUR_APP_KEY',
       cluster: 'eu',
     });
