@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.1.0](https://github.com/apinator-io/sdk-js/compare/v2.0.0...v2.1.0) (2026-10-13)
+
+
+### Features
+
+* authEncoding option; drop auth signed for a replaced socket ([276a9b2](https://github.com/apinator-io/sdk-js/commit/276a9b2b09734963b5ae08380912451b08a99d2a))
+* honor activityTimeout and reconnect options; fix dead reconnect ([078f143](https://github.com/apinator-io/sdk-js/commit/078f14366eb54442ef4ade9be196cfee7150a313))
+* honor activityTimeout and reconnect options; fix dead reconnect ([3e8e815](https://github.com/apinator-io/sdk-js/commit/3e8e81528b49ee3acef885e57280c3713596727a))
+
 ## [2.0.0](https://github.com/apinator-io/sdk-js/compare/v1.0.0...v2.0.0) (2026-02-16)
 
 
