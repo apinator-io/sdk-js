@@ -92,6 +92,44 @@ describe("Apinator", () => {
     expect(client.disconnect()).toBe(client);
   });
 
+  describe("reconnect", () => {
+    it("reconnects after a drop and resubscribes channels on the new socket", () => {
+      const client = createClient();
+      client.connect();
+      ws().simulateConnectionEstablished("sock.1");
+      client.subscribe("my-channel");
+      const first = ws();
+
+      first.onclose?.();
+      expect(client.state).toBe("connecting");
+      vi.advanceTimersByTime(1000);
+
+      expect(MockWebSocket.instances).toHaveLength(2);
+      ws().simulateConnectionEstablished("sock.2");
+      expect(client.state).toBe("connected");
+      expect(client.socketId).toBe("sock.2");
+      expect(sentMessages()).toContainEqual({
+        event: "realtime:subscribe",
+        data: JSON.stringify({ channel: "my-channel" }),
+      });
+    });
+
+    it("recovers from a missed pong without a page reload", () => {
+      const client = createClient();
+      client.connect();
+      ws().simulateConnectionEstablished("sock.1");
+
+      vi.advanceTimersByTime(120000); // ping
+      vi.advanceTimersByTime(30000); // no pong -> drop
+      expect(client.state).toBe("connecting");
+      vi.advanceTimersByTime(1000);
+
+      expect(MockWebSocket.instances).toHaveLength(2);
+      ws().simulateConnectionEstablished("sock.2");
+      expect(client.state).toBe("connected");
+    });
+  });
+
   describe("subscribe", () => {
     it("returns a Channel for public channels", () => {
       const client = createClient();

@@ -205,8 +205,8 @@ describe("Connection", () => {
     expect(MockWebSocket.instances).toHaveLength(1);
   });
 
-  it("goes unavailable after max reconnect attempts", () => {
-    const conn = createConnection();
+  it("goes unavailable after maxReconnectAttempts", () => {
+    const conn = createConnection({ maxReconnectAttempts: 6 });
     conn.connect();
 
     // Exhaust all 6 reconnect attempts
@@ -291,6 +291,207 @@ describe("Connection", () => {
     // No pong — wait 30s
     vi.advanceTimersByTime(30000);
     expect(ws.closed).toBe(true);
+  });
+
+  it("keeps the connection open when the pong arrives", () => {
+    const conn = createConnection();
+    conn.connect();
+    const ws = MockWebSocket.instances[0];
+    ws.simulateConnectionEstablished("123.456", 5);
+
+    // Several idle cycles, each answered by a pong.
+    for (let i = 0; i < 5; i++) {
+      vi.advanceTimersByTime(5000);
+      ws.simulateMessage({ event: "realtime:pong", data: "{}" });
+      vi.advanceTimersByTime(29000);
+    }
+
+    expect(ws.closed).toBe(false);
+    expect(conn.currentState).toBe("connected");
+  });
+
+  it("does not ping while the server keeps sending messages", () => {
+    const conn = createConnection();
+    conn.connect();
+    const ws = MockWebSocket.instances[0];
+    ws.simulateConnectionEstablished("123.456", 5);
+
+    for (let i = 0; i < 10; i++) {
+      vi.advanceTimersByTime(4000);
+      ws.simulateMessage({ event: "my-event", channel: "c", data: "{}" });
+    }
+
+    const sent = ws.sent.map((s) => JSON.parse(s));
+    expect(sent).not.toContainEqual({ event: "realtime:ping", data: "{}" });
+    expect(ws.closed).toBe(false);
+  });
+
+  it("uses the activityTimeout option over the server value", () => {
+    const conn = createConnection({ activityTimeout: 20 });
+    conn.connect();
+    const ws = MockWebSocket.instances[0];
+    ws.simulateConnectionEstablished("123.456", 120);
+
+    vi.advanceTimersByTime(19000);
+    expect(ws.sent).toHaveLength(0);
+    vi.advanceTimersByTime(1000);
+    expect(ws.sent.map((s) => JSON.parse(s))).toContainEqual({
+      event: "realtime:ping",
+      data: "{}",
+    });
+  });
+
+  it("allows an activityTimeout longer than the server value", () => {
+    const conn = createConnection({ activityTimeout: 300 });
+    conn.connect();
+    const ws = MockWebSocket.instances[0];
+    ws.simulateConnectionEstablished("123.456", 120);
+
+    vi.advanceTimersByTime(299000);
+    expect(ws.sent).toHaveLength(0);
+    vi.advanceTimersByTime(1000);
+    expect(ws.sent).toHaveLength(1);
+  });
+
+  it("ignores an invalid activityTimeout option", () => {
+    const conn = createConnection({ activityTimeout: 0 });
+    conn.connect();
+    const ws = MockWebSocket.instances[0];
+    ws.simulateConnectionEstablished("123.456", 5);
+
+    vi.advanceTimersByTime(5000);
+    expect(ws.sent).toHaveLength(1);
+  });
+
+  it("uses the pongTimeout option", () => {
+    const conn = createConnection({ pongTimeout: 5 });
+    conn.connect();
+    const ws = MockWebSocket.instances[0];
+    ws.simulateConnectionEstablished("123.456", 5);
+
+    vi.advanceTimersByTime(5000); // ping
+    vi.advanceTimersByTime(4999);
+    expect(ws.closed).toBe(false);
+    vi.advanceTimersByTime(1);
+    expect(ws.closed).toBe(true);
+  });
+
+  it("does not reconnect when enableReconnect is false", () => {
+    const conn = createConnection({ enableReconnect: false });
+    conn.connect();
+    const ws = MockWebSocket.instances[0];
+    ws.simulateConnectionEstablished();
+
+    ws.simulateClose();
+    expect(conn.currentState).toBe("unavailable");
+    vi.advanceTimersByTime(60000);
+    expect(MockWebSocket.instances).toHaveLength(1);
+  });
+
+  it("keeps reconnecting by default", () => {
+    const conn = createConnection();
+    conn.connect();
+
+    for (let i = 0; i < 20; i++) {
+      MockWebSocket.instances[MockWebSocket.instances.length - 1].simulateClose();
+      expect(conn.currentState).toBe("connecting");
+      vi.advanceTimersByTime(30000);
+    }
+    expect(MockWebSocket.instances).toHaveLength(21);
+  });
+
+  it("jitters the reconnect delay between 50% and 100% of the backoff", () => {
+    const conn = createConnection();
+    conn.connect();
+    MockWebSocket.instances[0].simulateConnectionEstablished();
+
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    MockWebSocket.instances[0].simulateClose(); // backoff 1000ms -> 500ms
+    vi.advanceTimersByTime(499);
+    expect(MockWebSocket.instances).toHaveLength(1);
+    vi.advanceTimersByTime(1);
+    expect(MockWebSocket.instances).toHaveLength(2);
+
+    vi.spyOn(Math, "random").mockReturnValue(0.999999);
+    MockWebSocket.instances[1].simulateClose(); // backoff 2000ms -> ~2000ms
+    vi.advanceTimersByTime(1998);
+    expect(MockWebSocket.instances).toHaveLength(2);
+    vi.advanceTimersByTime(2);
+    expect(MockWebSocket.instances).toHaveLength(3);
+  });
+
+  it("keeps backing off when the server closes right after open", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.999999);
+    const conn = createConnection();
+    conn.connect();
+
+    // Socket opens but is closed before connection_established (e.g. rejected).
+    const cycle = () => {
+      const ws = MockWebSocket.instances[MockWebSocket.instances.length - 1];
+      ws.simulateOpen();
+      ws.simulateClose();
+    };
+    cycle(); // attempt 0 -> ~1s
+    vi.advanceTimersByTime(1000);
+    cycle(); // attempt 1 -> ~2s
+    vi.advanceTimersByTime(1000);
+    expect(MockWebSocket.instances).toHaveLength(2);
+    vi.advanceTimersByTime(1000);
+    expect(MockWebSocket.instances).toHaveLength(3);
+  });
+
+  it("stops timers after disconnect", () => {
+    const conn = createConnection();
+    conn.connect();
+    const ws = MockWebSocket.instances[0];
+    ws.simulateConnectionEstablished("123.456", 5);
+    vi.advanceTimersByTime(5000); // ping sent, pong timer armed
+
+    conn.disconnect();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("reconnects after a missed pong", () => {
+    const conn = createConnection();
+    conn.connect();
+    MockWebSocket.instances[0].simulateConnectionEstablished("123.456", 5);
+
+    vi.advanceTimersByTime(5000 + 30000);
+    expect(MockWebSocket.instances[0].closed).toBe(true);
+    expect(conn.currentState).toBe("connecting");
+
+    vi.advanceTimersByTime(1000);
+    expect(MockWebSocket.instances).toHaveLength(2);
+  });
+
+  it("ignores a late close from a replaced socket", () => {
+    const conn = createConnection();
+    conn.connect();
+    const oldWs = MockWebSocket.instances[0];
+    oldWs.simulateConnectionEstablished();
+
+    conn.disconnect();
+    conn.connect();
+    const newWs = MockWebSocket.instances[1];
+    newWs.simulateConnectionEstablished("789.000");
+
+    oldWs.simulateClose();
+    expect(conn.currentState).toBe("connected");
+    expect(conn.id).toBe("789.000");
+    conn.send({ event: "test", data: "{}" });
+    expect(newWs.sent).toHaveLength(1);
+  });
+
+  it("connect() during a pending reconnect connects immediately", () => {
+    const conn = createConnection();
+    conn.connect();
+    MockWebSocket.instances[0].simulateConnectionEstablished();
+    MockWebSocket.instances[0].simulateClose();
+
+    conn.connect();
+    expect(MockWebSocket.instances).toHaveLength(2);
+    vi.advanceTimersByTime(60000);
+    expect(MockWebSocket.instances).toHaveLength(2);
   });
 
   it("ignores malformed WebSocket messages", () => {
