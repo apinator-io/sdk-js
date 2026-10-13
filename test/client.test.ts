@@ -92,6 +92,44 @@ describe("Apinator", () => {
     expect(client.disconnect()).toBe(client);
   });
 
+  describe("reconnect", () => {
+    it("reconnects after a drop and resubscribes channels on the new socket", () => {
+      const client = createClient();
+      client.connect();
+      ws().simulateConnectionEstablished("sock.1");
+      client.subscribe("my-channel");
+      const first = ws();
+
+      first.onclose?.();
+      expect(client.state).toBe("connecting");
+      vi.advanceTimersByTime(1000);
+
+      expect(MockWebSocket.instances).toHaveLength(2);
+      ws().simulateConnectionEstablished("sock.2");
+      expect(client.state).toBe("connected");
+      expect(client.socketId).toBe("sock.2");
+      expect(sentMessages()).toContainEqual({
+        event: "realtime:subscribe",
+        data: JSON.stringify({ channel: "my-channel" }),
+      });
+    });
+
+    it("recovers from a missed pong without a page reload", () => {
+      const client = createClient();
+      client.connect();
+      ws().simulateConnectionEstablished("sock.1");
+
+      vi.advanceTimersByTime(120000); // ping
+      vi.advanceTimersByTime(30000); // no pong -> drop
+      expect(client.state).toBe("connecting");
+      vi.advanceTimersByTime(1000);
+
+      expect(MockWebSocket.instances).toHaveLength(2);
+      ws().simulateConnectionEstablished("sock.2");
+      expect(client.state).toBe("connected");
+    });
+  });
+
   describe("subscribe", () => {
     it("returns a Channel for public channels", () => {
       const client = createClient();
@@ -556,6 +594,56 @@ describe("Apinator", () => {
       const data = JSON.parse(sub!.data as string);
       expect(data.auth).toBe("key:sig");
       expect(data.channel).toBe("private-orders");
+    });
+
+    it("uses form encoding when authEncoding is form", async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ auth: "key:sig" }),
+      });
+
+      const client = createClient({ authEndpoint: "/auth", authEncoding: "form" });
+      client.connect();
+      ws().simulateConnectionEstablished();
+      client.subscribe("private-orders");
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(mockFetch).toHaveBeenCalledWith("/auth", expect.objectContaining({
+        body: "socket_id=sock.123&channel_name=private-orders",
+      }));
+    });
+
+    it("drops an auth response signed for a socket that has since been replaced", async () => {
+      let resolveFirst!: (v: unknown) => void;
+      mockFetch
+        .mockImplementationOnce(() => new Promise((r) => (resolveFirst = r)))
+        .mockResolvedValue({
+          ok: true,
+          json: () => Promise.resolve({ auth: "key:sig-new" }),
+        });
+
+      const client = createClient({ authEndpoint: "/auth" });
+      client.connect();
+      ws().simulateConnectionEstablished("sock.old");
+      client.subscribe("private-orders"); // auth for sock.old now in flight
+
+      // Connection drops and comes back before the first auth returns.
+      ws().onclose?.();
+      expect(client.socketId).toBeNull();
+      await vi.advanceTimersByTimeAsync(1000);
+      ws().simulateConnectionEstablished("sock.new");
+      await vi.advanceTimersByTimeAsync(0);
+
+      resolveFirst({ ok: true, json: () => Promise.resolve({ auth: "key:sig-old" }) });
+      await vi.advanceTimersByTimeAsync(0);
+
+      const subs = sentMessages()
+        .filter((m) => m.event === "realtime:subscribe")
+        .map((m) => JSON.parse(m.data as string).auth);
+      expect(subs).toEqual(["key:sig-new"]);
+      expect(mockFetch).toHaveBeenLastCalledWith("/auth", expect.objectContaining({
+        body: JSON.stringify({ socket_id: "sock.new", channel_name: "private-orders" }),
+      }));
     });
 
     it("includes channel_data for presence channels", async () => {

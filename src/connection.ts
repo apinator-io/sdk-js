@@ -13,6 +13,17 @@ type StateChangeHandler = (
   current: ConnectionState
 ) => void;
 
+const DEFAULT_ACTIVITY_TIMEOUT_S = 120;
+const DEFAULT_PONG_TIMEOUT_S = 30;
+const MAX_RECONNECT_DELAY_MS = 30000;
+
+/** Returns `value` if it is a positive finite number, otherwise `undefined`. */
+function positive(value: number | undefined): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? value
+    : undefined;
+}
+
 export class Connection {
   private ws: WebSocket | null = null;
   private state: ConnectionState = "initialized";
@@ -22,6 +33,8 @@ export class Connection {
   private reconnectAttempts = 0;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private activityTimer: ReturnType<typeof setTimeout> | null = null;
+  private pongTimer: ReturnType<typeof setTimeout> | null = null;
+  private activityTimeoutMs = DEFAULT_ACTIVITY_TIMEOUT_S * 1000;
   private socketId: string | null = null;
 
   constructor(
@@ -47,24 +60,32 @@ export class Connection {
   }
 
   connect(): void {
-    if (this.state === "connected" || this.state === "connecting") return;
+    // A socket is already open or opening.
+    if (this.ws) return;
+
+    // An explicit connect() while a reconnect is pending connects right away.
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
 
     this.setState("connecting");
 
     const url = `${this.resolveWSHost()}/app/${this.options.appKey}?protocol=7&client=js&version=1.0.0`;
 
+    let ws: WebSocket;
     try {
-      this.ws = new WebSocket(url);
+      ws = new WebSocket(url);
     } catch {
       this.handleDisconnect();
       return;
     }
+    this.ws = ws;
 
-    this.ws.onopen = () => {
-      this.reconnectAttempts = 0;
-    };
-
-    this.ws.onmessage = (event: MessageEvent) => {
+    // Handlers ignore events from a socket that has since been replaced, so a
+    // late close from an old socket can't tear down the current one.
+    ws.onmessage = (event: MessageEvent) => {
+      if (this.ws !== ws) return;
       let msg: Message;
       try {
         msg = JSON.parse(event.data as string);
@@ -72,14 +93,17 @@ export class Connection {
         // Ignore malformed messages
         return;
       }
+      // Any traffic from the server proves the connection is alive.
+      this.resetActivityTimer();
       this.handleMessage(msg);
     };
 
-    this.ws.onclose = () => {
+    ws.onclose = () => {
+      if (this.ws !== ws) return;
       this.handleDisconnect();
     };
 
-    this.ws.onerror = () => {
+    ws.onerror = () => {
       // onclose will fire after onerror
     };
   }
@@ -103,11 +127,14 @@ export class Connection {
     if (msg.event === "realtime:connection_established") {
       const data = JSON.parse(msg.data);
       this.socketId = data.socket_id;
-      const timeout = data.activity_timeout || 120;
+      this.reconnectAttempts = 0;
+      const timeoutS =
+        positive(this.options.activityTimeout) ??
+        positive(data.activity_timeout) ??
+        DEFAULT_ACTIVITY_TIMEOUT_S;
+      this.activityTimeoutMs = timeoutS * 1000;
       this.setState("connected");
-      this.resetActivityTimer(timeout);
-    } else if (msg.event === "realtime:pong") {
-      // Activity timeout reset handled by receiving any message
+      this.resetActivityTimer();
     } else if (msg.event === "realtime:error") {
       const data = JSON.parse(msg.data);
       if (data.code >= 4000 && data.code <= 4004) {
@@ -126,25 +153,47 @@ export class Connection {
 
     if (this.state === "disconnected") return;
 
-    if (this.reconnectAttempts < 6) {
-      this.setState("connecting");
-      const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
-      this.reconnectAttempts++;
-      this.reconnectTimer = setTimeout(() => this.connect(), delay);
-    } else {
+    const maxAttempts = this.options.maxReconnectAttempts ?? Infinity;
+    if (this.options.enableReconnect === false || this.reconnectAttempts >= maxAttempts) {
       this.setState("unavailable");
+      return;
     }
+
+    this.setState("connecting");
+    const backoff = Math.min(1000 * Math.pow(2, this.reconnectAttempts), MAX_RECONNECT_DELAY_MS);
+    // Jitter (50–100% of the backoff) so clients dropped together by a server
+    // restart don't all reconnect in the same instant.
+    const delay = backoff * (0.5 + Math.random() * 0.5);
+    this.reconnectAttempts++;
+    this.reconnectTimer = setTimeout(() => this.connect(), delay);
   }
 
-  private resetActivityTimer(timeoutSeconds: number): void {
+  /**
+   * (Re)starts the idle timer. When it fires the client pings and waits up to
+   * pongTimeout for any server message; if none arrives the socket is closed
+   * and the normal reconnect path takes over.
+   */
+  private resetActivityTimer(): void {
+    if (this.state !== "connected" && this.state !== "connecting") return;
     if (this.activityTimer) clearTimeout(this.activityTimer);
+    if (this.pongTimer) {
+      clearTimeout(this.pongTimer);
+      this.pongTimer = null;
+    }
     this.activityTimer = setTimeout(() => {
+      this.activityTimer = null;
       this.send({ event: "realtime:ping", data: "{}" });
-      // If no pong within 30s, reconnect
-      this.activityTimer = setTimeout(() => {
-        if (this.ws) this.ws.close();
-      }, 30000);
-    }, timeoutSeconds * 1000);
+      const pongTimeoutS = positive(this.options.pongTimeout) ?? DEFAULT_PONG_TIMEOUT_S;
+      this.pongTimer = setTimeout(() => {
+        this.pongTimer = null;
+        // A dead network can delay onclose for a long time, so drop the socket
+        // and start reconnecting now instead of waiting for it.
+        const ws = this.ws;
+        if (!ws) return;
+        this.handleDisconnect();
+        ws.close();
+      }, pongTimeoutS * 1000);
+    }, this.activityTimeoutMs);
   }
 
   private clearTimers(): void {
@@ -156,11 +205,17 @@ export class Connection {
       clearTimeout(this.activityTimer);
       this.activityTimer = null;
     }
+    if (this.pongTimer) {
+      clearTimeout(this.pongTimer);
+      this.pongTimer = null;
+    }
   }
 
   private setState(state: ConnectionState): void {
     const prev = this.state;
     this.state = state;
+    // A socket ID only identifies the connection that announced it.
+    if (state !== "connected") this.socketId = null;
     if (prev !== state) {
       this.onStateChange(prev, state);
     }

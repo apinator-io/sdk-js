@@ -32,6 +32,28 @@ describe("fetchAuth", () => {
     });
   });
 
+  it("sends a form-encoded body when encoding is form", async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ auth: "key:sig" }),
+    });
+
+    await fetchAuth("123.456", "private-ch", {
+      endpoint: "/auth",
+      encoding: "form",
+      headers: { Authorization: "Bearer t" },
+    });
+
+    expect(mockFetch).toHaveBeenCalledWith("/auth", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Authorization: "Bearer t",
+      },
+      body: "socket_id=123.456&channel_name=private-ch",
+    });
+  });
+
   it("includes custom headers", async () => {
     mockFetch.mockResolvedValue({
       ok: true,
