@@ -8,6 +8,11 @@ export interface RealtimeOptions {
   /** Custom auth headers */
   authHeaders?: Record<string, string>;
   /**
+   * Body encoding for auth requests: `"json"` (default) or `"form"`
+   * (`application/x-www-form-urlencoded`, as pusher-js sends).
+   */
+  authEncoding?: "json" | "form";
+  /**
    * Seconds without any message from the server before the client sends a
    * ping to check the connection. Defaults to the server-provided value (120s).
    */

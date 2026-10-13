@@ -18,6 +18,7 @@ new Apinator(options: RealtimeOptions)
 | `cluster` | `string` | Yes | — | Region cluster ID (`eu`, `us`). Derives WebSocket URL as `wss://ws-{cluster}.apinator.io` |
 | `authEndpoint` | `string` | No | — | URL for private/presence channel authentication |
 | `authHeaders` | `Record<string, string>` | No | — | Custom headers sent with auth requests |
+| `authEncoding` | `"json" \| "form"` | No | `"json"` | Auth request body encoding. `"form"` sends `application/x-www-form-urlencoded`, as pusher-js does |
 | `activityTimeout` | `number` | No | server value (120) | Seconds without any server message before the client sends a ping |
 | `pongTimeout` | `number` | No | `30` | Seconds to wait for a reply to that ping before reconnecting |
 | `enableReconnect` | `boolean` | No | `true` | Reconnect automatically after an unexpected disconnect |

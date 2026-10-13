@@ -494,6 +494,23 @@ describe("Connection", () => {
     expect(MockWebSocket.instances).toHaveLength(2);
   });
 
+  it("clears the socket id when the connection is lost or closed", () => {
+    const conn = createConnection();
+    conn.connect();
+    MockWebSocket.instances[0].simulateConnectionEstablished("123.456");
+    expect(conn.id).toBe("123.456");
+
+    MockWebSocket.instances[0].simulateClose();
+    expect(conn.id).toBeNull();
+
+    vi.advanceTimersByTime(1000);
+    MockWebSocket.instances[1].simulateConnectionEstablished("789.000");
+    expect(conn.id).toBe("789.000");
+
+    conn.disconnect();
+    expect(conn.id).toBeNull();
+  });
+
   it("ignores malformed WebSocket messages", () => {
     const conn = createConnection();
     conn.connect();

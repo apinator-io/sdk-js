@@ -214,6 +214,8 @@ export class Connection {
   private setState(state: ConnectionState): void {
     const prev = this.state;
     this.state = state;
+    // A socket ID only identifies the connection that announced it.
+    if (state !== "connected") this.socketId = null;
     if (prev !== state) {
       this.onStateChange(prev, state);
     }

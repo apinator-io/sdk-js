@@ -596,6 +596,56 @@ describe("Apinator", () => {
       expect(data.channel).toBe("private-orders");
     });
 
+    it("uses form encoding when authEncoding is form", async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ auth: "key:sig" }),
+      });
+
+      const client = createClient({ authEndpoint: "/auth", authEncoding: "form" });
+      client.connect();
+      ws().simulateConnectionEstablished();
+      client.subscribe("private-orders");
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(mockFetch).toHaveBeenCalledWith("/auth", expect.objectContaining({
+        body: "socket_id=sock.123&channel_name=private-orders",
+      }));
+    });
+
+    it("drops an auth response signed for a socket that has since been replaced", async () => {
+      let resolveFirst!: (v: unknown) => void;
+      mockFetch
+        .mockImplementationOnce(() => new Promise((r) => (resolveFirst = r)))
+        .mockResolvedValue({
+          ok: true,
+          json: () => Promise.resolve({ auth: "key:sig-new" }),
+        });
+
+      const client = createClient({ authEndpoint: "/auth" });
+      client.connect();
+      ws().simulateConnectionEstablished("sock.old");
+      client.subscribe("private-orders"); // auth for sock.old now in flight
+
+      // Connection drops and comes back before the first auth returns.
+      ws().onclose?.();
+      expect(client.socketId).toBeNull();
+      await vi.advanceTimersByTimeAsync(1000);
+      ws().simulateConnectionEstablished("sock.new");
+      await vi.advanceTimersByTimeAsync(0);
+
+      resolveFirst({ ok: true, json: () => Promise.resolve({ auth: "key:sig-old" }) });
+      await vi.advanceTimersByTimeAsync(0);
+
+      const subs = sentMessages()
+        .filter((m) => m.event === "realtime:subscribe")
+        .map((m) => JSON.parse(m.data as string).auth);
+      expect(subs).toEqual(["key:sig-new"]);
+      expect(mockFetch).toHaveBeenLastCalledWith("/auth", expect.objectContaining({
+        body: JSON.stringify({ socket_id: "sock.new", channel_name: "private-orders" }),
+      }));
+    });
+
     it("includes channel_data for presence channels", async () => {
       mockFetch.mockResolvedValue({
         ok: true,

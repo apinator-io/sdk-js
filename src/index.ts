@@ -260,15 +260,17 @@ export class Apinator {
         return;
       }
 
+      const socketId = this.connection.id;
       try {
-        const authResp = await fetchAuth(
-          this.connection.id,
-          channel.name,
-          {
-            endpoint: this.options.authEndpoint,
-            headers: this.options.authHeaders,
-          }
-        );
+        const authResp = await fetchAuth(socketId, channel.name, {
+          endpoint: this.options.authEndpoint,
+          headers: this.options.authHeaders,
+          encoding: this.options.authEncoding,
+        });
+
+        // The connection was replaced while auth was in flight: this signature
+        // is for the old socket. The reconnect resubscribes with a fresh one.
+        if (this.connection.id !== socketId) return;
 
         const subscribeData: Record<string, string> = {
           channel: channel.name,
@@ -308,6 +310,7 @@ export class Apinator {
           data: JSON.stringify(subscribeData),
         });
       } catch (err) {
+        if (this.connection.id !== socketId) return;
         this.pendingPresenceSelf.delete(channel.name);
         channel.handleError({
           type: "AuthError",
