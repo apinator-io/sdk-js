@@ -3,11 +3,26 @@
 ## [2.1.0](https://github.com/apinator-io/sdk-js/compare/v2.0.0...v2.1.0) (2026-10-13)
 
 
+### ⚠ Behaviour change
+
+* Reconnection is now unlimited by default; 2.0.0 gave up after 6 attempts. Set `maxReconnectAttempts` to restore a limit.
+
+
+### Bug Fixes
+
+* **reconnect:** the client never reconnected after a dropped connection. It stayed in `connecting` until the page was reloaded ([3e8e815](https://github.com/apinator-io/sdk-js/commit/3e8e81528b49ee3acef885e57280c3713596727a))
+* **keep-alive:** a pong did not cancel the close timer, so every connection dropped itself about 150s after connecting. Every server message now re-arms the activity timer ([3e8e815](https://github.com/apinator-io/sdk-js/commit/3e8e81528b49ee3acef885e57280c3713596727a))
+* **keep-alive:** a missed pong drops the socket and reconnects immediately instead of waiting for a dead network to report the close ([3e8e815](https://github.com/apinator-io/sdk-js/commit/3e8e81528b49ee3acef885e57280c3713596727a))
+* a late `onclose` from a replaced socket (e.g. after `disconnect()` then `connect()`) no longer tears down the current connection ([3e8e815](https://github.com/apinator-io/sdk-js/commit/3e8e81528b49ee3acef885e57280c3713596727a))
+* the reconnect counter resets on `connection_established` rather than raw socket open, so a server that rejects right after opening gets backoff instead of 1s retries ([3e8e815](https://github.com/apinator-io/sdk-js/commit/3e8e81528b49ee3acef885e57280c3713596727a))
+* **auth:** the socket ID is cleared when the connection is lost, and an auth response signed for a replaced socket is discarded; the reconnect resubscribes with a fresh signature ([276a9b2](https://github.com/apinator-io/sdk-js/commit/276a9b2b09734963b5ae08380912451b08a99d2a))
+
+
 ### Features
 
-* authEncoding option; drop auth signed for a replaced socket ([276a9b2](https://github.com/apinator-io/sdk-js/commit/276a9b2b09734963b5ae08380912451b08a99d2a))
-* honor activityTimeout and reconnect options; fix dead reconnect ([078f143](https://github.com/apinator-io/sdk-js/commit/078f14366eb54442ef4ade9be196cfee7150a313))
-* honor activityTimeout and reconnect options; fix dead reconnect ([3e8e815](https://github.com/apinator-io/sdk-js/commit/3e8e81528b49ee3acef885e57280c3713596727a))
+* `activityTimeout`, `pongTimeout`, `enableReconnect` and `maxReconnectAttempts` options. These were documented before but not implemented; `activityTimeout` overrides the server's value ([3e8e815](https://github.com/apinator-io/sdk-js/commit/3e8e81528b49ee3acef885e57280c3713596727a))
+* `authEncoding: "json" | "form"` option. `"form"` sends `application/x-www-form-urlencoded` auth requests, as pusher-js does; JSON remains the default ([276a9b2](https://github.com/apinator-io/sdk-js/commit/276a9b2b09734963b5ae08380912451b08a99d2a))
+* reconnect delays are jittered (50–100% of the backoff) so clients dropped together don't reconnect in lockstep ([3e8e815](https://github.com/apinator-io/sdk-js/commit/3e8e81528b49ee3acef885e57280c3713596727a))
 
 ## [2.0.0](https://github.com/apinator-io/sdk-js/compare/v1.0.0...v2.0.0) (2026-02-16)
 
