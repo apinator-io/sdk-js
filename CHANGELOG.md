@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.2.0](https://github.com/apinator-io/sdk-js/compare/v2.1.0...v2.2.0) (2026-10-14)
+
+
+### Features
+
+* stop on refused connections and show why; validate appKey and cluster ([2b1cdb5](https://github.com/apinator-io/sdk-js/commit/2b1cdb508e69011a1fdc3fc086532f5d54e3cc55))
+
 ## [2.1.0](https://github.com/apinator-io/sdk-js/compare/v2.0.0...v2.1.0) (2026-10-13)
 
 
