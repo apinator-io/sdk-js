@@ -1,5 +1,23 @@
 # Changelog
 
+## [2.2.0](https://github.com/apinator-io/sdk-js/compare/v2.1.0...v2.2.0) (2026-10-14)
+
+
+### ⚠ Behaviour change
+
+* `new Apinator(...)` now throws if `appKey` or `cluster` is missing, empty, `"undefined"` or `"null"`. These could never connect: a missing cluster retried `ws-undefined.apinator.io` forever. The error says what to fix (for example, an environment variable that isn't set) [2b1cdb5](https://github.com/apinator-io/sdk-js/commit/2b1cdb508e69011a1fdc3fc086532f5d54e3cc55)
+
+
+### Bug Fixes
+
+* **errors:** a connection refused for a reason retrying cannot fix (any `realtime:error` or close code 4000–4099: invalid app key, app disabled, wrong cluster) now stops the client instead of reconnecting forever. Previously only 4000–4004 did [2b1cdb5](https://github.com/apinator-io/sdk-js/commit/2b1cdb508e69011a1fdc3fc086532f5d54e3cc55)
+* **errors:** fatal errors now reach `bind("realtime:error", ...)`; they were dropped before the app could see them [2b1cdb5](https://github.com/apinator-io/sdk-js/commit/2b1cdb508e69011a1fdc3fc086532f5d54e3cc55)
+
+
+### Features
+
+* the server's explanation is logged as `[apinator] <message> (code N)`. With the current server it names the likely mistake: an app ID used as the key, a placeholder from an example, a revoked key, or the cluster to use [2b1cdb5](https://github.com/apinator-io/sdk-js/commit/2b1cdb508e69011a1fdc3fc086532f5d54e3cc55)
+
 ## [2.1.0](https://github.com/apinator-io/sdk-js/compare/v2.0.0...v2.1.0) (2026-10-13)
 
 
