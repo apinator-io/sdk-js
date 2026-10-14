@@ -11,7 +11,7 @@ class MockWebSocket {
   url: string;
   readyState = MockWebSocket.OPEN;
   onopen: (() => void) | null = null;
-  onclose: (() => void) | null = null;
+  onclose: ((event?: CloseEvent) => void) | null = null;
   onmessage: ((event: { data: string }) => void) | null = null;
   onerror: (() => void) | null = null;
   sent: string[] = [];
@@ -40,8 +40,8 @@ class MockWebSocket {
     this.onmessage?.({ data: JSON.stringify(msg) });
   }
 
-  simulateClose() {
-    this.onclose?.();
+  simulateClose(code?: number) {
+    this.onclose?.(code === undefined ? undefined : ({ code } as CloseEvent));
   }
 
   simulateConnectionEstablished(
@@ -509,6 +509,44 @@ describe("Connection", () => {
 
     conn.disconnect();
     expect(conn.id).toBeNull();
+  });
+
+  it("stops on any 4000-4099 error, surfaces the message, and does not reconnect", () => {
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const conn = createConnection();
+    conn.connect();
+    const ws = MockWebSocket.instances[0];
+    ws.simulateConnectionEstablished();
+
+    const message = 'This app is in the "eu" region but connected to "us". Set cluster: "eu" in the client options.';
+    ws.simulateMessage({ event: "realtime:error", data: JSON.stringify({ code: 4010, message }) });
+
+    expect(conn.currentState).toBe("disconnected");
+    expect(onMessage).toHaveBeenCalledWith(expect.objectContaining({ event: "realtime:error" }));
+    expect(errSpy).toHaveBeenCalledWith(`[apinator] ${message} (code 4010)`);
+    vi.advanceTimersByTime(120000);
+    expect(MockWebSocket.instances).toHaveLength(1);
+  });
+
+  it("does not reconnect after a fatal close code even without an error message", () => {
+    const conn = createConnection();
+    conn.connect();
+    MockWebSocket.instances[0].simulateClose(4001);
+
+    expect(conn.currentState).toBe("disconnected");
+    vi.advanceTimersByTime(120000);
+    expect(MockWebSocket.instances).toHaveLength(1);
+  });
+
+  it("reconnects after a non-fatal close code (4200 server restart)", () => {
+    const conn = createConnection();
+    conn.connect();
+    MockWebSocket.instances[0].simulateConnectionEstablished();
+    MockWebSocket.instances[0].simulateClose(4200);
+
+    expect(conn.currentState).toBe("connecting");
+    vi.advanceTimersByTime(1000);
+    expect(MockWebSocket.instances).toHaveLength(2);
   });
 
   it("ignores malformed WebSocket messages", () => {

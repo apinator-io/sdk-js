@@ -17,6 +17,14 @@ const DEFAULT_ACTIVITY_TIMEOUT_S = 120;
 const DEFAULT_PONG_TIMEOUT_S = 30;
 const MAX_RECONNECT_DELAY_MS = 30000;
 
+/**
+ * Codes 4000-4099 mean the server refused the connection for a reason retrying
+ * cannot fix (invalid app key, app disabled, wrong cluster), so the client stops.
+ */
+export function isFatalCode(code: unknown): boolean {
+  return typeof code === "number" && code >= 4000 && code < 4100;
+}
+
 /** Returns `value` if it is a positive finite number, otherwise `undefined`. */
 function positive(value: number | undefined): number | undefined {
   return typeof value === "number" && Number.isFinite(value) && value > 0
@@ -98,8 +106,15 @@ export class Connection {
       this.handleMessage(msg);
     };
 
-    ws.onclose = () => {
+    ws.onclose = (event?: CloseEvent) => {
       if (this.ws !== ws) return;
+      if (event && isFatalCode(event.code)) {
+        // Refused for good (the realtime:error explaining why may have arrived
+        // first); reconnecting would fail the same way forever.
+        this.ws = null;
+        this.disconnect();
+        return;
+      }
       this.handleDisconnect();
     };
 
@@ -137,8 +152,11 @@ export class Connection {
       this.resetActivityTimer();
     } else if (msg.event === "realtime:error") {
       const data = JSON.parse(msg.data);
-      if (data.code >= 4000 && data.code <= 4004) {
-        // Fatal error, don't reconnect
+      if (isFatalCode(data.code)) {
+        // The server says why (e.g. an app ID used as the key, or the wrong
+        // cluster). Surface it, let bind("realtime:error") see it, then stop.
+        console.error(`[apinator] ${data.message ?? "connection refused"} (code ${data.code})`);
+        this.onMessage(msg);
         this.disconnect();
         return;
       }
