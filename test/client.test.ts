@@ -92,6 +92,29 @@ describe("Apinator", () => {
     expect(client.disconnect()).toBe(client);
   });
 
+  describe("option validation", () => {
+    it.each([undefined, "", "undefined", "null"])("throws a clear error for appKey %j", (appKey) => {
+      expect(() => new Apinator({ appKey: appKey as string, cluster: "eu" })).toThrow(/appKey is .*environment variable/);
+    });
+
+    it.each([undefined, "", "undefined"])("throws a clear error for cluster %j", (cluster) => {
+      expect(() => new Apinator({ appKey: "app_x", cluster: cluster as string })).toThrow(/cluster is .*"eu" or "us"/);
+    });
+
+    it("lets the app observe a fatal error through bind", () => {
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      const client = createClient();
+      const seen = vi.fn();
+      client.bind("realtime:error", seen);
+      client.connect();
+      ws().onmessage?.({
+        data: JSON.stringify({ event: "realtime:error", data: JSON.stringify({ code: 4001, message: "nope" }) }),
+      });
+      expect(seen).toHaveBeenCalledWith({ code: 4001, message: "nope" });
+      expect(client.state).toBe("disconnected");
+    });
+  });
+
   describe("reconnect", () => {
     it("reconnects after a drop and resubscribes channels on the new socket", () => {
       const client = createClient();

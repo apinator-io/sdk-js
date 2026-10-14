@@ -17,6 +17,7 @@ export class Apinator {
   private globalBindings: Map<string, Set<EventCallback>> = new Map();
 
   constructor(options: RealtimeOptions) {
+    validateOptions(options);
     this.options = options;
     this.connection = new Connection(
       options,
@@ -392,4 +393,24 @@ function isPresenceMemberRemovedData(
   if (!data || typeof data !== "object") return false;
   const info = data as { user_id?: unknown };
   return typeof info.user_id === "string" && info.user_id.length > 0;
+}
+
+/**
+ * Fails fast on options that can never connect. A missing cluster is the worst
+ * case: the client would retry ws-undefined.apinator.io forever, and no server is
+ * ever reached that could explain it.
+ */
+function validateOptions(options: RealtimeOptions): void {
+  const unset = (v: unknown) =>
+    v === undefined || v === null || (typeof v === "string" && ["", "undefined", "null"].includes(v.trim()));
+  if (!options || unset(options.appKey)) {
+    throw new Error(
+      `Apinator: appKey is ${JSON.stringify(options?.appKey)}. Pass the app key from your app's API keys in the console (it starts with "app_"). If it comes from an environment variable, check that it is defined where this code runs.`
+    );
+  }
+  if (unset(options.cluster)) {
+    throw new Error(
+      `Apinator: cluster is ${JSON.stringify(options.cluster)}. Set it to the region your app was created in, e.g. "eu" or "us".`
+    );
+  }
 }
