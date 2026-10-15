@@ -1,4 +1,5 @@
 import type { Message, RealtimeOptions } from "./types";
+import { SDK_VERSION } from "./version";
 
 export type ConnectionState =
   | "initialized"
@@ -79,7 +80,7 @@ export class Connection {
 
     this.setState("connecting");
 
-    const url = `${this.resolveWSHost()}/app/${this.options.appKey}?protocol=7&client=js&version=1.0.0`;
+    const url = `${this.resolveWSHost()}/app/${this.options.appKey}?protocol=7&client=js&version=${encodeURIComponent(SDK_VERSION)}`;
 
     let ws: WebSocket;
     try {

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Connection } from "../src/connection";
 import type { Message } from "../src/types";
+import pkg from "../package.json";
 
 // Mock WebSocket
 class MockWebSocket {
@@ -95,7 +96,7 @@ describe("Connection", () => {
     conn.connect();
     const ws = MockWebSocket.instances[0];
     expect(ws.url).toBe(
-      "wss://ws-eu.apinator.io/app/test-key?protocol=7&client=js&version=1.0.0"
+      `wss://ws-eu.apinator.io/app/test-key?protocol=7&client=js&version=${pkg.version}`
     );
   });
 
@@ -104,7 +105,7 @@ describe("Connection", () => {
     conn.connect();
     const ws = MockWebSocket.instances[0];
     expect(ws.url).toBe(
-      "wss://ws-us.apinator.io/app/test-key?protocol=7&client=js&version=1.0.0"
+      `wss://ws-us.apinator.io/app/test-key?protocol=7&client=js&version=${pkg.version}`
     );
   });
 
