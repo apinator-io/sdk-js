@@ -1,6 +1,6 @@
 {
   "name": "@apinator/client",
-  "version": "2.2.0",
+  "version": "2.2.1",
   "description": "JavaScript client SDK for Apinator — real-time WebSocket messaging",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
