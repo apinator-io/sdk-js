@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.2.2](https://github.com/apinator-io/sdk-js/compare/v2.2.1...v2.2.2) (2026-10-17)
+
+
+### Miscellaneous Chores
+
+* release 2.2.2 ([fd6e8ee](https://github.com/apinator-io/sdk-js/commit/fd6e8eebaf855a6b137615faf28e799db1a5a8c8))
+
 ## [2.2.1](https://github.com/apinator-io/sdk-js/compare/v2.2.0...v2.2.1) (2026-10-15)
 
 
