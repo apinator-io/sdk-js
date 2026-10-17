@@ -27,12 +27,12 @@
   "author": "Apinator <dev@apinator.io> (https://apinator.io)",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/apinator-io/client-js.git"
+    "url": "git+https://github.com/apinator-io/sdk-js.git"
   },
   "bugs": {
-    "url": "https://github.com/apinator-io/client-js/issues"
+    "url": "https://github.com/apinator-io/sdk-js/issues"
   },
-  "homepage": "https://github.com/apinator-io/client-js#readme",
+  "homepage": "https://github.com/apinator-io/sdk-js#readme",
   "keywords": [
     "apinator",
     "realtime",
