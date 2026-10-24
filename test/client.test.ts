@@ -92,6 +92,38 @@ describe("Apinator", () => {
     expect(client.disconnect()).toBe(client);
   });
 
+  describe("WebSocket implementation", () => {
+    it("connects through the WebSocket option", () => {
+      vi.stubGlobal("WebSocket", undefined);
+      const client = new Apinator({ appKey: "test-key", cluster: "eu", WebSocket: MockWebSocket });
+      client.connect();
+      ws().simulateConnectionEstablished();
+      expect(client.state).toBe("connected");
+    });
+
+    it("reports a missing WebSocket to realtime:error and state_change, once", () => {
+      vi.stubGlobal("WebSocket", undefined);
+      const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const onError = vi.fn();
+      const onState = vi.fn();
+      const client = createClient();
+      client.bind("realtime:error", onError);
+      client.bind("state_change", onState);
+      client.connect();
+
+      expect(client.state).toBe("unavailable");
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(onError.mock.calls[0][0]).toMatchObject({
+        type: "WebSocketUnavailable",
+        message: expect.stringContaining("No WebSocket implementation found"),
+      });
+      expect(onState).toHaveBeenCalledWith({ previous: "initialized", current: "unavailable" });
+      vi.advanceTimersByTime(10 * 60 * 1000);
+      expect(errSpy).toHaveBeenCalledTimes(1);
+      expect(onError).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("option validation", () => {
     it.each([undefined, "", "undefined", "null"])("throws a clear error for appKey %j", (appKey) => {
       expect(() => new Apinator({ appKey: appKey as string, cluster: "eu" })).toThrow(/appKey is .*environment variable/);

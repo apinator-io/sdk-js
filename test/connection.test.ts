@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { Connection } from "../src/connection";
+import { Connection, NO_WEBSOCKET_MESSAGE } from "../src/connection";
 import type { Message } from "../src/types";
 import pkg from "../package.json";
 
@@ -576,5 +576,92 @@ describe("Connection", () => {
         }),
       });
     }).toThrow();
+  });
+
+  describe("WebSocket implementation", () => {
+    it("uses the WebSocket option instead of the global", () => {
+      const globalCtor = vi.fn();
+      vi.stubGlobal("WebSocket", globalCtor);
+      const conn = createConnection({ WebSocket: MockWebSocket });
+      conn.connect();
+
+      expect(globalCtor).not.toHaveBeenCalled();
+      expect(MockWebSocket.instances).toHaveLength(1);
+      MockWebSocket.instances[0].simulateConnectionEstablished();
+      expect(conn.currentState).toBe("connected");
+
+      // send() must not read WebSocket.OPEN from the (here unusable) global.
+      conn.send({ event: "test", data: "{}" });
+      expect(MockWebSocket.instances[0].sent).toEqual([JSON.stringify({ event: "test", data: "{}" })]);
+    });
+
+    it("reconnects with the WebSocket option", () => {
+      vi.stubGlobal("WebSocket", undefined);
+      const conn = createConnection({ WebSocket: MockWebSocket });
+      conn.connect();
+      MockWebSocket.instances[0].simulateConnectionEstablished();
+      MockWebSocket.instances[0].simulateClose();
+
+      vi.advanceTimersByTime(1000);
+      expect(MockWebSocket.instances).toHaveLength(2);
+    });
+
+    it("reports a missing WebSocket once and does not retry", () => {
+      vi.stubGlobal("WebSocket", undefined);
+      const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const conn = createConnection();
+      conn.connect();
+
+      expect(conn.currentState).toBe("unavailable");
+      expect(onStateChange).toHaveBeenCalledTimes(1);
+      expect(onStateChange).toHaveBeenCalledWith("initialized", "unavailable");
+      expect(errSpy).toHaveBeenCalledTimes(1);
+      expect(errSpy).toHaveBeenCalledWith(`[apinator] ${NO_WEBSOCKET_MESSAGE}`);
+      expect(NO_WEBSOCKET_MESSAGE).toMatch(/Node < 22 install `ws`/);
+      expect(onMessage).toHaveBeenCalledTimes(1);
+      expect(onMessage).toHaveBeenCalledWith({
+        event: "realtime:error",
+        data: JSON.stringify({ type: "WebSocketUnavailable", message: NO_WEBSOCKET_MESSAGE }),
+      });
+
+      vi.advanceTimersByTime(10 * 60 * 1000);
+      expect(errSpy).toHaveBeenCalledTimes(1);
+      expect(onStateChange).toHaveBeenCalledTimes(1);
+      expect(vi.getTimerCount()).toBe(0);
+
+      // An explicit connect() tries again, e.g. after a polyfill loads.
+      vi.stubGlobal("WebSocket", MockWebSocket);
+      conn.connect();
+      expect(MockWebSocket.instances).toHaveLength(1);
+      expect(conn.currentState).toBe("connecting");
+    });
+
+    it("rejects a WebSocket option that is not a constructor", () => {
+      const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const conn = createConnection({ WebSocket: { default: MockWebSocket } });
+      conn.connect();
+
+      expect(conn.currentState).toBe("unavailable");
+      expect(errSpy).toHaveBeenCalledTimes(1);
+      expect(errSpy.mock.calls[0][0]).toMatch(/must be a WebSocket constructor, got object/);
+      expect(MockWebSocket.instances).toHaveLength(0);
+    });
+
+    it("stops instead of retrying when the constructor throws", () => {
+      const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const Throwing = vi.fn(() => {
+        throw new SyntaxError("The URL is invalid.");
+      });
+      const conn = createConnection({ WebSocket: Throwing });
+      conn.connect();
+
+      expect(conn.currentState).toBe("unavailable");
+      expect(errSpy).toHaveBeenCalledTimes(1);
+      expect(errSpy.mock.calls[0][0]).toMatch(/^\[apinator\] Could not open a WebSocket to wss:\/\/ws-eu\.apinator\.io\/.*: The URL is invalid\.$/);
+      expect(JSON.parse(onMessage.mock.calls[0][0].data)).toMatchObject({ type: "WebSocketError" });
+
+      vi.advanceTimersByTime(10 * 60 * 1000);
+      expect(Throwing).toHaveBeenCalledTimes(1);
+    });
   });
 });

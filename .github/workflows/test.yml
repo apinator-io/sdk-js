@@ -37,3 +37,4 @@ jobs:
           npm pack --dry-run
           node -e "const m = require('./dist/index.js'); if (!m.Apinator) throw new Error('CJS missing Apinator')"
           node -e "import('./dist/index.mjs').then(m => { if (!m.Apinator) throw new Error('ESM missing Apinator') })"
+          node -e "const g = {}; new Function('globalThis', require('fs').readFileSync('./dist/apinator.min.js', 'utf8'))(g); if (typeof g.Apinator !== 'function' || g.Apinator.Apinator !== g.Apinator) throw new Error('script-tag build missing global Apinator')"

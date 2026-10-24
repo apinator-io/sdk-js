@@ -10,7 +10,8 @@ src/
 ├── connection.ts  — WebSocket lifecycle + reconnection
 ├── channel.ts     — Channel + PresenceChannel
 ├── auth.ts        — Auth endpoint fetch
-└── types.ts       — Shared type definitions
+├── types.ts       — Shared type definitions
+└── global.ts      — Entry for the script-tag build (sets globalThis.Apinator)
 ```
 
 ## Connection State Machine
@@ -27,6 +28,9 @@ initialized ──connect()──→ connecting ──onopen+established──�
                                                       unavailable
 
 Any state ──disconnect()──→ disconnected (terminal, no reconnect)
+
+connect() with no WebSocket implementation, or a constructor that throws
+          ──→ unavailable (logged once, realtime:error, no reconnect)
 ```
 
 ## Reconnection Strategy
