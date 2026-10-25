@@ -347,7 +347,13 @@ export class Apinator {
 }
 
 // Re-export types
-export type { RealtimeOptions, Message, EventCallback } from "./types";
+export type {
+  RealtimeOptions,
+  Message,
+  EventCallback,
+  WebSocketConstructor,
+  WebSocketLike,
+} from "./types";
 export type { ConnectionState } from "./connection";
 export { Channel, PresenceChannel } from "./channel";
 

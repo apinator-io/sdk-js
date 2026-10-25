@@ -14,7 +14,7 @@ JavaScript client SDK for [Apinator](https://apinator.io) — real-time WebSocke
 - Presence member tracking
 - TypeScript-first with full type definitions
 - Zero dependencies — works in any modern browser
-- Dual ESM + CommonJS builds
+- ESM, CommonJS and script-tag builds
 
 ## Installation
 
@@ -22,11 +22,58 @@ JavaScript client SDK for [Apinator](https://apinator.io) — real-time WebSocke
 npm install @apinator/client
 ```
 
-Or via CDN:
+### Without a bundler
+
+Save this as `index.html` and open it. The script tag defines a global `Apinator`:
 
 ```html
-<script src="https://cdn.jsdelivr.net/npm/@apinator/client/dist/index.mjs" type="module"></script>
+<!DOCTYPE html>
+<html>
+  <body>
+    <script src="https://cdn.jsdelivr.net/npm/@apinator/client@2.3.0/dist/apinator.min.js"></script>
+    <script>
+      const client = new Apinator({
+        appKey: 'your-app-key',
+        cluster: 'eu',
+      });
+
+      client.connect();
+
+      const channel = client.subscribe('my-channel');
+
+      channel.bind('my-event', (data) => {
+        console.log('Received:', data);
+      });
+    </script>
+  </body>
+</html>
 ```
+
+Then publish `my-event` on `my-channel` from your server (for example with
+[`@apinator/server`](https://www.npmjs.com/package/@apinator/server)) and it is logged in the browser console.
+
+Prefer ES modules? Import from the module build instead:
+
+```html
+<script type="module">
+  import { Apinator } from 'https://cdn.jsdelivr.net/npm/@apinator/client@2.3.0/dist/index.mjs';
+</script>
+```
+
+### Node.js
+
+Node 22+ has a global `WebSocket`. On older versions, install [`ws`](https://www.npmjs.com/package/ws)
+and pass it in:
+
+```typescript
+import WebSocket from 'ws';
+import { Apinator } from '@apinator/client';
+
+const client = new Apinator({ appKey: 'your-app-key', cluster: 'eu', WebSocket });
+```
+
+Without one, `connect()` logs `No WebSocket implementation found…`, reports it to
+`bind('realtime:error', ...)` and moves to `unavailable` instead of retrying.
 
 ## Quick Start
 

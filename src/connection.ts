@@ -1,4 +1,9 @@
-import type { Message, RealtimeOptions } from "./types";
+import type {
+  Message,
+  RealtimeOptions,
+  WebSocketConstructor,
+  WebSocketLike,
+} from "./types";
 import { SDK_VERSION } from "./version";
 
 export type ConnectionState =
@@ -17,6 +22,12 @@ type StateChangeHandler = (
 const DEFAULT_ACTIVITY_TIMEOUT_S = 120;
 const DEFAULT_PONG_TIMEOUT_S = 30;
 const MAX_RECONNECT_DELAY_MS = 30000;
+// WebSocket.OPEN, as a literal: the global may not exist when an implementation
+// is passed in the options.
+const WS_OPEN = 1;
+
+export const NO_WEBSOCKET_MESSAGE =
+  'No WebSocket implementation found. In Node < 22 install `ws` and pass it: import WebSocket from "ws"; new Apinator({ appKey, cluster, WebSocket })';
 
 /**
  * Codes 4000-4099 mean the server refused the connection for a reason retrying
@@ -34,7 +45,7 @@ function positive(value: number | undefined): number | undefined {
 }
 
 export class Connection {
-  private ws: WebSocket | null = null;
+  private ws: WebSocketLike | null = null;
   private state: ConnectionState = "initialized";
   private options: RealtimeOptions;
   private onMessage: MessageHandler;
@@ -78,22 +89,42 @@ export class Connection {
       this.reconnectTimer = null;
     }
 
+    const WebSocketImpl =
+      this.options.WebSocket ??
+      (globalThis as { WebSocket?: WebSocketConstructor }).WebSocket;
+    if (typeof WebSocketImpl !== "function") {
+      // Retrying can't make one appear, so stop and say how to fix it.
+      this.fail(
+        "WebSocketUnavailable",
+        this.options.WebSocket == null
+          ? NO_WEBSOCKET_MESSAGE
+          : `The WebSocket option must be a WebSocket constructor, got ${typeof WebSocketImpl}. With \`ws\`, pass its default export.`
+      );
+      return;
+    }
+
     this.setState("connecting");
 
     const url = `${this.resolveWSHost()}/app/${this.options.appKey}?protocol=7&client=js&version=${encodeURIComponent(SDK_VERSION)}`;
 
-    let ws: WebSocket;
+    let ws: WebSocketLike;
     try {
-      ws = new WebSocket(url);
-    } catch {
-      this.handleDisconnect();
+      ws = new WebSocketImpl(url);
+    } catch (err) {
+      // The constructor only throws for input it rejects outright (a malformed
+      // URL, a blocked port, a CSP rule), so the same URL would throw on every
+      // retry. Network failures arrive later as onclose and still reconnect.
+      this.fail(
+        "WebSocketError",
+        `Could not open a WebSocket to ${url}: ${err instanceof Error ? err.message : String(err)}`
+      );
       return;
     }
     this.ws = ws;
 
     // Handlers ignore events from a socket that has since been replaced, so a
     // late close from an old socket can't tear down the current one.
-    ws.onmessage = (event: MessageEvent) => {
+    ws.onmessage = (event: { data: unknown }) => {
       if (this.ws !== ws) return;
       let msg: Message;
       try {
@@ -107,7 +138,7 @@ export class Connection {
       this.handleMessage(msg);
     };
 
-    ws.onclose = (event?: CloseEvent) => {
+    ws.onclose = (event?: { code: number }) => {
       if (this.ws !== ws) return;
       if (event && isFatalCode(event.code)) {
         // Refused for good (the realtime:error explaining why may have arrived
@@ -134,7 +165,7 @@ export class Connection {
   }
 
   send(msg: Message): void {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+    if (this.ws && this.ws.readyState === WS_OPEN) {
       this.ws.send(JSON.stringify(msg));
     }
   }
@@ -164,6 +195,22 @@ export class Connection {
     }
 
     this.onMessage(msg);
+  }
+
+  /**
+   * Stops for good on a client-side problem retrying cannot fix: logs it once,
+   * reports it to bind("realtime:error", ...) like a server refusal, and moves
+   * to `unavailable`. A later explicit connect() tries again.
+   */
+  private fail(type: string, message: string): void {
+    this.ws = null;
+    this.clearTimers();
+    console.error(`[apinator] ${message}`);
+    this.onMessage({
+      event: "realtime:error",
+      data: JSON.stringify({ type, message }),
+    });
+    this.setState("unavailable");
   }
 
   private handleDisconnect(): void {

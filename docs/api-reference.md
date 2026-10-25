@@ -23,6 +23,7 @@ new Apinator(options: RealtimeOptions)
 | `pongTimeout` | `number` | No | `30` | Seconds to wait for a reply to that ping before reconnecting |
 | `enableReconnect` | `boolean` | No | `true` | Reconnect automatically after an unexpected disconnect |
 | `maxReconnectAttempts` | `number` | No | unlimited | Consecutive failed reconnects before the state becomes `unavailable` |
+| `WebSocket` | `WebSocketConstructor` | No | global `WebSocket` | WebSocket implementation, e.g. the `ws` package on Node < 22: `new Apinator({ appKey, cluster, WebSocket })` |
 
 ### Methods
 
@@ -90,6 +91,13 @@ client.bind("realtime:error", ({ code, message }) => showSetupError(message));
 ```
 
 Other close codes (e.g. 4200 server restart, network drops) reconnect automatically.
+
+Problems on the client that retrying cannot fix are reported the same way, without a `code`, and move the client to `unavailable`. A later `connect()` tries again.
+
+| `type` | Meaning |
+|--------|---------|
+| `WebSocketUnavailable` | No global `WebSocket` and no `WebSocket` option (e.g. Node < 22). Install `ws` and pass it in. |
+| `WebSocketError` | The WebSocket constructor threw, e.g. for a malformed URL or a CSP rule. The message includes its error. |
 
 ## Channel
 
