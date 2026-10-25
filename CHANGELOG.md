@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.3.0](https://github.com/apinator-io/sdk-js/compare/v2.2.2...v2.3.0) (2026-10-25)
+
+
+### Features
+
+* script-tag build and a WebSocket option; fail loudly without one ([41872ad](https://github.com/apinator-io/sdk-js/commit/41872ad07adb4d01c90ebcaa2efe7b480d39056b))
+* script-tag build and a WebSocket option; fail loudly without one ([f9b76bf](https://github.com/apinator-io/sdk-js/commit/f9b76bf2f11cccdf3226fcaded331d916eaf05b8))
+
 ## [2.2.2](https://github.com/apinator-io/sdk-js/compare/v2.2.1...v2.2.2) (2026-10-17)
 
 
